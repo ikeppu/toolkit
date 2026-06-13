@@ -50,25 +50,30 @@ func (t *Tools) RandomString(n int) string {
 }
 
 // UploadedFile is struct used to save information about an uploaded file
-type UplaodedFile struct {
+type UploadFile struct {
 	NewFileName      string
 	OriginalFileName string
 	FileSize         int64
 }
 
-func (t *Tools) UploadFiles(r *http.Request, uploadDir string, rename ...bool) ([]*UplaodedFile, error) {
+func (t *Tools) UploadFiles(r *http.Request, uploadDir string, rename ...bool) ([]*UploadFile, error) {
 	renameFile := true
 	if len(rename) > 0 {
 		renameFile = rename[0]
 	}
 
-	var uploadedFiles []*UplaodedFile
+	var uploadedFiles []*UploadFile
 
 	if t.MaxFilesSize == 0 {
 		t.MaxFilesSize = 1024 * 1024 * 1024
 	}
 
-	err := r.ParseMultipartForm(int64(t.MaxFilesSize))
+	err := t.CreateDirIfNotExist(uploadDir)
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.ParseMultipartForm(int64(t.MaxFilesSize))
 
 	if err != nil {
 		return nil, errors.New("the uploaded file is to big")
@@ -76,8 +81,8 @@ func (t *Tools) UploadFiles(r *http.Request, uploadDir string, rename ...bool) (
 
 	for _, fHeaders := range r.MultipartForm.File {
 		for _, hdr := range fHeaders {
-			uploadedFiles, err = func(uploadedFiles []*UplaodedFile) ([]*UplaodedFile, error) {
-				var uploadedFile UplaodedFile
+			uploadedFiles, err = func(uploadedFiles []*UploadFile) ([]*UploadFile, error) {
+				var uploadedFile UploadFile
 				infile, err := hdr.Open()
 				if err != nil {
 					return nil, err
@@ -149,7 +154,7 @@ func (t *Tools) UploadFiles(r *http.Request, uploadDir string, rename ...bool) (
 	return uploadedFiles, nil
 }
 
-func (t *Tools) UploadFile(r *http.Request, uploadDir string, rename ...bool) (*UplaodedFile, error) {
+func (t *Tools) UploadFile(r *http.Request, uploadDir string, rename ...bool) (*UploadFile, error) {
 
 	renameFile := true
 
@@ -164,4 +169,17 @@ func (t *Tools) UploadFile(r *http.Request, uploadDir string, rename ...bool) (*
 	}
 
 	return files[0], nil
+}
+
+func (t *Tools) CreateDirIfNotExist(path string) error {
+	const mode = 0755
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		err := os.MkdirAll(path, mode)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
